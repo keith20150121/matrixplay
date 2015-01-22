@@ -129,6 +129,8 @@ public class MatrixView extends TextView
 	
 	private final int m_nLines = 4;
 	private final int m_nColumns = 4;
+	private final float m_fDefaultTextSize = 100.0f;
+	private final float m_fDescent = 15.0f;
 	private IntRectF[][] m_elementRects;
 	private RandomGenerator m_rg;
 	private Paint m_painter;
@@ -139,7 +141,7 @@ public class MatrixView extends TextView
 		super(context, attribs);
 		m_painter = new Paint();
 		m_textPainter = new Paint(Paint.ANTI_ALIAS_FLAG);
-		m_textPainter.setTextSize(100.0f);
+		m_textPainter.setTextSize(m_fDefaultTextSize);
 		m_textPainter.setTextAlign(Paint.Align.CENTER);
 		m_textPainter.setColor(Color.RED);
 		m_painter.setColor(Color.BLACK);
@@ -167,13 +169,17 @@ public class MatrixView extends TextView
 	
 	private void slideLeft()
 	{
-		boolean bNew = true;
+		boolean bMerged = false;
 		for (IntRectF[] ira : m_elementRects)
 		{
-			for (int i = ira.length - 1; i > 0 ; --i)
+			for (int i = ira.length - 1; i > 0; --i)
 			{
-				bNew = ira[i - 1].Add(ira[i]);
-			}
+				bMerged = ira[i - 1].Add(ira[i]);
+				if (bMerged)
+					break;
+			}			
+			if (bMerged)
+				break;
 		}
 		
 		genNumber();
@@ -182,12 +188,17 @@ public class MatrixView extends TextView
 	
 	private void slideRight()
 	{
+		boolean bMerged = false;
 		for (IntRectF[] ira : m_elementRects)
 		{
 			for (int i = 0; i < ira.length - 1 ; ++i)
 			{
-				ira[i + 1].Add(ira[i]);
-			}
+				bMerged = ira[i + 1].Add(ira[i]);
+				if (bMerged)
+					break;
+			}			
+			if (bMerged)
+				break;	
 		}	
 		
 		genNumber();
@@ -196,12 +207,17 @@ public class MatrixView extends TextView
 	
 	private void slideUp()
 	{
+		boolean bMerged = false;		
 		for (int j = 0; j < m_nColumns; ++j)
 		{		
 			for (int i = m_elementRects.length - 1; i > 0; --i)
 			{
-				m_elementRects[i - 1][j].Add(m_elementRects[i][j]);
+				bMerged = m_elementRects[i - 1][j].Add(m_elementRects[i][j]);
+				if (bMerged)
+					break;
 			}
+			if (bMerged)
+				break;
 		}
 
 		genNumber();
@@ -210,12 +226,17 @@ public class MatrixView extends TextView
 	
 	private void slideDown()
 	{
+		boolean bMerged = false;
 		for (int j = 0; j < m_nColumns; ++j)
 		{		
 			for (int i = 0; i < m_elementRects.length - 1; ++i)
 			{
-				m_elementRects[i + 1][j].Add(m_elementRects[i][j]);
+				bMerged = m_elementRects[i + 1][j].Add(m_elementRects[i][j]);
+				if (bMerged)
+					break;
 			}
+			if (bMerged)
+				break;
 		}
 
 		genNumber();
@@ -337,6 +358,7 @@ public class MatrixView extends TextView
 				
 				String strNum = String.valueOf(ir.num);
 				m_textPainter.getTextBounds(strNum, 0, strNum.length(), rfBound);
+			//	ir.rt.contains(, top, right, bottom)
 				canvas.drawText(
 						strNum, 
 						ir.rt.centerX(), 
