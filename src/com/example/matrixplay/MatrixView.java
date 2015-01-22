@@ -1,47 +1,136 @@
 package com.example.matrixplay;
 
+import java.util.HashSet;
 import java.util.Random;
 
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Paint.FontMetrics;
-import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
-class IntRectF
+class Position
 {
-	public int num;
-	public RectF rt = new RectF();
+	public int line;
+	public int column;
 	
-	public void Add(final IntRectF other)
+	public Position()
 	{
-		if (other.num == num)
-			num += other.num;
+		line = column = 0;
+	}
+	
+	public Position(int l, int c)
+	{
+		setPosition(l, c);
+	}
+	
+	public void setPosition(int l, int c)
+	{
+		line = l;
+		column = c;
+	}
+	
+	@Override
+	public boolean equals(Object obj)
+	{
+		if (obj instanceof Position)
+		{
+			Position other = (Position)obj;
+			return line == other.line && column == other.column;
+		}
+		else
+			return false;
+	}
+	
+	@Override
+	public int hashCode()
+	{
+		return line * 10 + column;
 	}
 }
 
-class RandomGenerator
+class IntRectF
 {
-	private static final Random m_rand = new Random(System.currentTimeMillis());
-	private static final int[] s_candidate = new int[]{2, 4, 8};
+	public int num = 0;
+	public RectF rt = new RectF();
+	public Position pos = new Position();
 	
-	public int Next()
+	public boolean Add(IntRectF other)
 	{
-		return s_candidate[m_rand.nextInt(2)];
+		if (other.num == num || num == 0)
+		{
+			num += other.num;
+			other.num = 0;
+			return true;
+		}
+		return false;
+	}
+}
+
+final class RandomGenerator 
+{
+	private final Random m_rand = new Random(System.currentTimeMillis());
+	private final int[] m_candidate = new int[]{0, 0, 2, 2, 2, 2, 4, 4, 8};
+	private IntRectF[][] m_elementRects;
+	private HashSet<Position> m_positions = new HashSet<Position>();
+	
+	public RandomGenerator(final IntRectF[][] rects)
+	{
+		m_elementRects = rects;
+	}
+	
+	public int NextNumber()
+	{
+		int idx = m_rand.nextInt(m_candidate.length);
+		return m_candidate[idx];
+	}
+	
+	public Position NextPosition()
+	{
+		for (IntRectF[] ira : m_elementRects)
+		{
+			for (IntRectF ir : ira)
+			{
+				if (ir.num == 0)
+					m_positions.add(ir.pos);
+				else
+					m_positions.remove(ir.pos);
+			}
+		}
+		int n = m_positions.size();
+		int rand = m_rand.nextInt(n);
+		int i = 0;
+		
+		if (m_positions.size() == 0)
+			return null;
+		
+		for (Position pos : m_positions)
+		{
+			if (i++ < rand)
+				continue;
+			else
+				return pos;
+		}
+		
+		return null;
 	}
 }
 
 public class MatrixView extends TextView 
 {
+	private static final String TAG = "MatrixView";
+	
 	private final int m_nLines = 4;
 	private final int m_nColumns = 4;
 	private IntRectF[][] m_elementRects;
+	private RandomGenerator m_rg;
 	private Paint m_painter;
 	private Paint m_textPainter;
 	private boolean m_bInitElement = false;
@@ -54,9 +143,150 @@ public class MatrixView extends TextView
 		m_textPainter.setTextAlign(Paint.Align.CENTER);
 		m_textPainter.setColor(Color.RED);
 		m_painter.setColor(Color.BLACK);
+		handleOnTouch();		
+	}	
+	
+	private void genNumber()
+	{
+		int num = m_rg.NextNumber();
+		if (num == 0)
+			return;
+		
+		Position pos = m_rg.NextPosition();
+		if (pos == null)
+			return;
+		
+		if (pos.column >= m_nColumns || pos.line >= m_nLines)
+		{
+			Log.e(TAG, "Pos out of range!!");
+			return;
+		}
+		
+		m_elementRects[pos.line][pos.column].num = num;
 	}
+	
+	private void slideLeft()
+	{
+		boolean bNew = true;
+		for (IntRectF[] ira : m_elementRects)
+		{
+			for (int i = ira.length - 1; i > 0 ; --i)
+			{
+				bNew = ira[i - 1].Add(ira[i]);
+			}
+		}
+		
+		genNumber();
+		invalidate();
+	}
+	
+	private void slideRight()
+	{
+		for (IntRectF[] ira : m_elementRects)
+		{
+			for (int i = 0; i < ira.length - 1 ; ++i)
+			{
+				ira[i + 1].Add(ira[i]);
+			}
+		}	
+		
+		genNumber();
+		invalidate();
+	}
+	
+	private void slideUp()
+	{
+		for (int j = 0; j < m_nColumns; ++j)
+		{		
+			for (int i = m_elementRects.length - 1; i > 0; --i)
+			{
+				m_elementRects[i - 1][j].Add(m_elementRects[i][j]);
+			}
+		}
 
-	private void InitElementRects(int nLine, int nColumn, int width, int height)
+		genNumber();
+		invalidate();
+	}
+	
+	private void slideDown()
+	{
+		for (int j = 0; j < m_nColumns; ++j)
+		{		
+			for (int i = 0; i < m_elementRects.length - 1; ++i)
+			{
+				m_elementRects[i + 1][j].Add(m_elementRects[i][j]);
+			}
+		}
+
+		genNumber();
+		invalidate();
+	}
+	
+	private void handleOnTouch()
+	{
+		this.setOnTouchListener(new OnTouchListener()
+		{
+			private float m_x = 0.0f;
+			private float m_y = 0.0f;
+			
+			@Override
+			public boolean onTouch(View v, MotionEvent event) 
+			{
+				switch(event.getAction())
+				{
+				case MotionEvent.ACTION_DOWN:
+					m_x = event.getX();
+					m_y = event.getY();
+					break;
+				case MotionEvent.ACTION_MOVE:
+					break;
+				case MotionEvent.ACTION_UP:
+				{
+					float disX = m_x - event.getX();
+					float disY = m_y - event.getY();
+					
+					if (Math.abs(disX) > Math.abs(disY))
+					{
+						int ret = Float.compare(disX, 0.0f);
+						if (ret > 0)
+						{
+							// move left
+							Log.d(TAG, "Move Left");
+							slideLeft();
+						}
+						else if (ret < 0)
+						{
+							// move right
+							Log.d(TAG, "Move Right");
+							slideRight();
+						}
+					}
+					else
+					{
+						int ret = Float.compare(disY, 0.0f);
+						if (ret > 0)
+						{
+							// move up
+							Log.d(TAG, "Move Up");
+							slideUp();
+						}
+						else if (ret < 0)
+						{
+							// move down
+							Log.d(TAG, "Move Down");
+							slideDown();
+						}						
+					}
+					
+				}
+					break;
+				}
+				return true;
+			}			
+		});
+	}
+	
+	private void initElementRects(int nLine, int nColumn, int width, int height)
 	{
 		if (m_elementRects != null)
 			return;
@@ -79,30 +309,38 @@ public class MatrixView extends TextView
 				rt[j].rt.right = xPos + columnBlank;
 				rt[j].rt.top = yPos;
 				rt[j].rt.bottom = yPos + lineBlank;
-				
+				rt[j].pos.setPosition(i, j);
 				//test
-				rt[j].num = i * j;
+				//rt[j].num = i * j;
 				
 				xPos += columnBlank;
 			}
 			yPos += lineBlank;
 			xPos = 0.0f;
 		}
+		
+		m_rg = new RandomGenerator(m_elementRects);
+		
+		for (int i = 0; i < m_nLines; ++i)
+			genNumber();
 	}
 	
 	private void drawNumber(Canvas canvas)
 	{
 		Rect rfBound = new Rect();
-		for (IntRectF[] ir : m_elementRects)
+		for (IntRectF[] ira : m_elementRects)
 		{
-			for (IntRectF ira : ir)
+			for (IntRectF ir : ira)
 			{
-				String strNum = String.valueOf(ira.num);
+				if (ir.num == 0)
+					continue;
+				
+				String strNum = String.valueOf(ir.num);
 				m_textPainter.getTextBounds(strNum, 0, strNum.length(), rfBound);
 				canvas.drawText(
 						strNum, 
-						ira.rt.centerX(), 
-						ira.rt.top + (rfBound.height() + ira.rt.height()) / 2, 
+						ir.rt.centerX(), 
+						ir.rt.top + (rfBound.height() + ir.rt.height()) / 2, 
 						m_textPainter);
 			}
 		}
@@ -124,13 +362,14 @@ public class MatrixView extends TextView
 		if (!m_bInitElement)
 		{
 			m_bInitElement = true;
-			InitElementRects(m_nLines, m_nColumns, round, round);
+			initElementRects(m_nLines, m_nColumns, round, round);
 		}
 		
 		drawMatrix(canvas, m_nLines, m_nColumns, round, round);
 		drawNumber(canvas);
 	}
 		
+	
 	private void drawMatrix(Canvas canvas, int nLine, int nColumn, int width, int height)
 	{
 		float lineBlank = (float)height / nLine;

@@ -11,6 +11,6 @@
     <com.example.matrixplay.MatrixView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:text="@string/hello_world" />
+        android:text="" />
 
 </RelativeLayout>
