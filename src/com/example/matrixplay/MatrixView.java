@@ -1,5 +1,7 @@
 package com.example.matrixplay;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Random;
 
@@ -58,19 +60,30 @@ class Position
 
 class IntRectF
 {
+	public static final int ZERO = 0;
+	public static final int MERGED = 1;
+	public static final int BLOCKED = 2;
+	
 	public int num = 0;
 	public RectF rt = new RectF();
 	public Position pos = new Position();
 	
-	public boolean Add(IntRectF other)
-	{
-		if (other.num == num || num == 0)
+	public int Add(IntRectF other)
+	{		
+		if (other.num == num)
 		{
 			num += other.num;
 			other.num = 0;
-			return true;
+			return MERGED;
 		}
-		return false;
+		else if (num == 0 || other.num == 0)
+		{
+			num += other.num;
+			other.num = 0;
+			return ZERO;
+		}
+		else
+			return BLOCKED;
 	}
 }
 
@@ -88,6 +101,9 @@ final class RandomGenerator
 	
 	public int NextNumber()
 	{
+		if (m_candidate.length <= 0)
+			return -1;
+		
 		int idx = m_rand.nextInt(m_candidate.length);
 		return m_candidate[idx];
 	}
@@ -127,10 +143,11 @@ public class MatrixView extends TextView
 {
 	private static final String TAG = "MatrixView";
 	
-	private final int m_nLines = 4;
-	private final int m_nColumns = 4;
-	private final float m_fDefaultTextSize = 100.0f;
+	private final int m_nLines = 5;
+	private final int m_nColumns = 5;
+	private final float m_fDefaultTextSize = 400.0f / m_nColumns;
 	private final float m_fDescent = 15.0f;
+	private HashMap<Integer, Float> m_textSizeMap = new HashMap<Integer, Float>();
 	private IntRectF[][] m_elementRects;
 	private RandomGenerator m_rg;
 	private Paint m_painter;
@@ -167,80 +184,255 @@ public class MatrixView extends TextView
 		m_elementRects[pos.line][pos.column].num = num;
 	}
 	
+	private ArrayList<Integer> collectNotZero(IntRectF[] ira)
+	{
+		ArrayList<Integer> c = new ArrayList<Integer>();
+		for (int i = 0; i < ira.length; ++i)
+		{
+			if (ira[i].num != 0)
+				c.add(ira[i].num);
+		}
+		return c;
+	}
+	
+	private ArrayList<Integer> collectNotZero(int iColumn)
+	{
+		if (iColumn < 0 || iColumn >= m_nColumns)
+			return null;
+
+		ArrayList<Integer> c = new ArrayList<Integer>();
+		for (int i = 0; i < m_elementRects.length; ++i)
+		{
+			if (m_elementRects[i][iColumn].num != 0)
+				c.add(m_elementRects[i][iColumn].num);
+		}
+		return c;
+	}
+	
+	private void moveLeft(IntRectF[] ira)
+	{
+		ArrayList<Integer> c = collectNotZero(ira);
+		
+		if (c.size() == 0)
+			return;
+		
+		int i = 0;
+		for (; i < c.size(); ++i)
+		{
+			ira[i].num = c.get(i);
+		}
+		
+		for (; i < ira.length; ++i)
+		{
+			ira[i].num = 0;
+		}
+	}
+	
+	private void moveRight(IntRectF[] ira)
+	{
+		ArrayList<Integer> c = collectNotZero(ira);
+		
+		if (c.size() == 0)
+			return;
+		
+		int n = ira.length - c.size();
+		for (int i = 0; i < n; ++i)
+		{
+			ira[i].num = 0;
+		}
+		
+		for (int i = n, j = 0; i < ira.length; ++i, ++j)
+		{
+			ira[i].num = c.get(j);
+		}
+	}
+	
+	private void moveDown(int iColumn)
+	{				
+		if (iColumn >= m_nColumns || iColumn < 0)
+			return;
+		
+		ArrayList<Integer> c = collectNotZero(iColumn);
+		
+		if (c.size() == 0)
+			return;
+		
+		int n = m_nColumns - c.size();
+		
+		for (int i = 0; i < n; ++i)
+		{
+			m_elementRects[i][iColumn].num = 0;
+		}
+		
+		for (int i = n, j = 0; i < m_elementRects.length; ++i, ++j)
+		{
+			m_elementRects[i][iColumn].num = c.get(j);
+		}
+	}
+	
+	private void moveUp(int iColumn)
+	{	
+		if (iColumn >= m_nColumns || iColumn < 0)
+			return;
+		
+		ArrayList<Integer> c = collectNotZero(iColumn);
+		
+		if (c.size() == 0)
+			return;
+				
+		int i = 0;
+		for (; i < c.size(); ++i)
+		{
+			m_elementRects[i][iColumn].num = c.get(i);
+		}
+		
+		for (; i < m_elementRects.length; ++i)
+		{
+			m_elementRects[i][iColumn].num = 0;
+		}
+	}
+	
 	private void slideLeft()
 	{
-		boolean bMerged = false;
+		boolean bMoveLeft = false;
+		boolean bBlocked = true;
+		int addResult = IntRectF.ZERO;
 		for (IntRectF[] ira : m_elementRects)
 		{
 			for (int i = ira.length - 1; i > 0; --i)
 			{
-				bMerged = ira[i - 1].Add(ira[i]);
-				if (bMerged)
+				addResult = ira[i - 1].Add(ira[i]);
+				
+				switch (addResult)
+				{
+				case IntRectF.ZERO:
+					bMoveLeft = true;
+					// no break;
+				case IntRectF.MERGED:
+					bBlocked = false;
+				default:
 					break;
-			}			
-			if (bMerged)
-				break;
+				}
+			}
+			
+			if (bMoveLeft)
+			{
+				moveLeft(ira);
+			}
 		}
 		
-		genNumber();
-		invalidate();
+		if (!bBlocked)
+		{
+			genNumber();
+			invalidate();
+		}
 	}
 	
 	private void slideRight()
 	{
-		boolean bMerged = false;
+		boolean bMoveRight = false;
+		boolean bBlocked = true;
+		int addResult = IntRectF.ZERO;
 		for (IntRectF[] ira : m_elementRects)
 		{
 			for (int i = 0; i < ira.length - 1 ; ++i)
 			{
-				bMerged = ira[i + 1].Add(ira[i]);
-				if (bMerged)
+				addResult = ira[i + 1].Add(ira[i]);
+				
+				switch (addResult)
+				{
+				case IntRectF.ZERO:
+					bMoveRight = true;
+					// no break;
+				case IntRectF.MERGED:
+					bBlocked = false;
+				default:
 					break;
-			}			
-			if (bMerged)
-				break;	
+				}
+			}
+			
+			if (bMoveRight)
+			{
+				moveRight(ira);
+			}
 		}	
 		
-		genNumber();
-		invalidate();
+		if (!bBlocked)
+		{
+			genNumber();
+			invalidate();
+		}
 	}
 	
 	private void slideUp()
 	{
-		boolean bMerged = false;		
+		boolean bMoveUp = false;
+		boolean bBlocked = true;
+		int addResult = IntRectF.ZERO;		
 		for (int j = 0; j < m_nColumns; ++j)
 		{		
 			for (int i = m_elementRects.length - 1; i > 0; --i)
 			{
-				bMerged = m_elementRects[i - 1][j].Add(m_elementRects[i][j]);
-				if (bMerged)
+				addResult = m_elementRects[i - 1][j].Add(m_elementRects[i][j]);
+				switch (addResult)
+				{
+				case IntRectF.ZERO:
+					bMoveUp = true;
+					// no break;
+				case IntRectF.MERGED:
+					bBlocked = false;
+				default:
 					break;
+				}
 			}
-			if (bMerged)
-				break;
+			
+			
+			if (bMoveUp)
+			{
+				moveUp(j);
+			}
 		}
 
-		genNumber();
-		invalidate();
+		if (!bBlocked)
+		{
+			genNumber();
+			invalidate();
+		}
 	}
 	
 	private void slideDown()
 	{
-		boolean bMerged = false;
+		boolean bMoveDown = false;
+		boolean bBlocked = true;
+		int addResult = IntRectF.ZERO;
 		for (int j = 0; j < m_nColumns; ++j)
 		{		
 			for (int i = 0; i < m_elementRects.length - 1; ++i)
 			{
-				bMerged = m_elementRects[i + 1][j].Add(m_elementRects[i][j]);
-				if (bMerged)
+				addResult = m_elementRects[i + 1][j].Add(m_elementRects[i][j]);
+				switch (addResult)
+				{
+				case IntRectF.ZERO:
+					bMoveDown = true;
+					// no break;
+				case IntRectF.MERGED:
+					bBlocked = false;
+				default:
 					break;
+				}
 			}
-			if (bMerged)
-				break;
+			
+			if (bMoveDown)
+			{
+				moveDown(j);
+			}
 		}
 
-		genNumber();
-		invalidate();
+		if (!bBlocked)
+		{
+			genNumber();
+			invalidate();
+		}
 	}
 	
 	private void handleOnTouch()
@@ -331,8 +523,6 @@ public class MatrixView extends TextView
 				rt[j].rt.top = yPos;
 				rt[j].rt.bottom = yPos + lineBlank;
 				rt[j].pos.setPosition(i, j);
-				//test
-				//rt[j].num = i * j;
 				
 				xPos += columnBlank;
 			}
@@ -349,6 +539,9 @@ public class MatrixView extends TextView
 	private void drawNumber(Canvas canvas)
 	{
 		Rect rfBound = new Rect();
+		final RectF compExp = m_elementRects[0][0].rt;
+		float fTextSize = m_fDefaultTextSize;
+		
 		for (IntRectF[] ira : m_elementRects)
 		{
 			for (IntRectF ir : ira)
@@ -356,14 +549,47 @@ public class MatrixView extends TextView
 				if (ir.num == 0)
 					continue;
 				
-				String strNum = String.valueOf(ir.num);
-				m_textPainter.getTextBounds(strNum, 0, strNum.length(), rfBound);
-			//	ir.rt.contains(, top, right, bottom)
+				String strNum = String.valueOf(ir.num);					
+				Float f = m_textSizeMap.get(strNum.length());
+
+				if (f == null)
+				{
+					m_textPainter.getTextBounds(strNum, 0, strNum.length(), rfBound);
+					RectF rfBoundF = new RectF();	
+					rfBoundF.set(
+							Math.abs(rfBound.left), 
+							Math.abs(rfBound.top), 
+							Math.abs(rfBound.right), 
+							Math.abs(rfBound.bottom));	
+					
+					while (!compExp.contains(rfBoundF) && Float.compare(fTextSize, 0.0f) > 0)
+					{
+						fTextSize -= m_fDescent;
+						m_textPainter.setTextSize(fTextSize);
+						m_textPainter.getTextBounds(strNum, 0, strNum.length(), rfBound);
+						rfBoundF.set(
+								Math.abs(rfBound.left), 
+								Math.abs(rfBound.top), 
+								Math.abs(rfBound.right), 
+								Math.abs(rfBound.bottom));
+					}
+
+					m_textPainter.setTextSize(fTextSize);
+					m_textSizeMap.put(strNum.length(), fTextSize);
+					fTextSize = m_fDefaultTextSize;
+				}
+				else
+				{
+					m_textPainter.setTextSize(f);
+					m_textPainter.getTextBounds(strNum, 0, strNum.length(), rfBound);
+				}
+				
 				canvas.drawText(
 						strNum, 
 						ir.rt.centerX(), 
 						ir.rt.top + (rfBound.height() + ir.rt.height()) / 2, 
-						m_textPainter);
+						m_textPainter);				
+
 			}
 		}
 	}
