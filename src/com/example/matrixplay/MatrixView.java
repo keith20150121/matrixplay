@@ -219,132 +219,8 @@ public class MatrixView extends TextView
 		return c;
 	}
 	
-	private boolean canMoveFromRightToleft(IntRectF[] ira)
-	{
-		boolean bFirstCount = false;
-		boolean bZeroCount = false;
-		for (int i = 0; i < ira.length; --i)
-		{
-			if (!bFirstCount)
-			{
-				if (ira[i].num == 0)
-				{
-					bZeroCount = true;
-				}
-
-				bFirstCount = true;
-				continue;
-			}
-			
-			if (!bZeroCount)
-			{
-				if (ira[i].num == 0)
-					bZeroCount = true;
-			}
-			else if (ira[i].num != 0)
-				return true;				
-		}
-		
-		return false;
-	}
-	
-	private boolean canMoveFromLeftToRight(IntRectF[] ira)
-	{
-		boolean bFirstCount = false;
-		boolean bZeroCount = false;
-		for (int i = ira.length - 1; i >= 0; --i)
-		{
-			if (!bFirstCount)
-			{
-				if (ira[i].num == 0)
-				{
-					bZeroCount = true;
-				}
-
-				bFirstCount = true;
-				continue;
-			}
-			
-			if (!bZeroCount)
-			{
-				if (ira[i].num == 0)
-					bZeroCount = true;
-			}
-			else if (ira[i].num != 0)
-				return true;				
-		}
-		
-		return false;
-	}
-	
-	private boolean canMoveFromUpToDown(int iColumn)
-	{
-		if (iColumn >= m_elementRects.length || iColumn < 0)
-			return false;
-		
-		boolean bFirstCount = false;
-		boolean bZeroCount = false;
-		for (int i = 0; i < m_elementRects.length; ++i)
-		{
-			if (!bFirstCount)
-			{
-				if (m_elementRects[i][iColumn].num == 0)
-				{
-					bZeroCount = true;
-				}
-
-				bFirstCount = true;
-				continue;
-			}
-			
-			if (!bZeroCount)
-			{
-				if (m_elementRects[i][iColumn].num == 0)
-					bZeroCount = true;
-			}
-			else if (m_elementRects[i][iColumn].num != 0)
-				return true;				
-		}
-		return false;
-	}
-	
-	private boolean canMoveFromDownToUp(int iColumn)
-	{
-		if (iColumn >= m_elementRects.length || iColumn < 0)
-			return false;
-		
-		boolean bFirstCount = false;
-		boolean bZeroCount = false;
-		for (int i = m_elementRects.length - 1; i >= 0; --i)
-		{
-			if (!bFirstCount)
-			{
-				if (m_elementRects[i][iColumn].num == 0)
-				{
-					bZeroCount = true;
-				}
-
-				bFirstCount = true;
-				continue;
-			}
-			
-			if (!bZeroCount)
-			{
-				if (m_elementRects[i][iColumn].num == 0)
-					bZeroCount = true;
-			}
-			else if (m_elementRects[i][iColumn].num != 0)
-				return true;				
-		}
-		
-		return false;
-	}
-	
 	private boolean moveLeft(IntRectF[] ira)
 	{
-	//	if (!canMoveFromRightToleft(ira))
-	//		return false;
-		
 		ArrayList<Integer> c = collectNotZero(ira);
 		
 		if (c.size() == 0)
@@ -366,9 +242,6 @@ public class MatrixView extends TextView
 	
 	private boolean moveRight(IntRectF[] ira)
 	{
-	//	if (!canMoveFromLeftToRight(ira))
-	//		return false;
-		
 		ArrayList<Integer> c = collectNotZero(ira);
 		
 		if (c.size() == 0)
@@ -392,9 +265,6 @@ public class MatrixView extends TextView
 	{				
 		if (iColumn >= m_nColumns || iColumn < 0)
 			return false;
-		
-	//	if (!canMoveFromUpToDown(iColumn))
-	//		return false;
 		
 		ArrayList<Integer> c = collectNotZero(iColumn);
 		
@@ -420,9 +290,6 @@ public class MatrixView extends TextView
 	{	
 		if (iColumn >= m_nColumns || iColumn < 0)
 			return false;
-		
-	//	if (!canMoveFromDownToUp(iColumn))
-	//		return false;
 		
 		ArrayList<Integer> c = collectNotZero(iColumn);
 		
