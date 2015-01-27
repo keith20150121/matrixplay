@@ -1,7 +1,6 @@
 package com.example.matrixplay;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Random;
 
@@ -13,10 +12,10 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.SparseArray;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TextView;
-import android.widget.Toast;
 
 class Position
 {
@@ -72,12 +71,15 @@ class IntRectF
 	{		
 		if (other.num == num)
 		{
+			if (num == 0)
+				return ZERO;
+				
 			num += other.num;
 			other.num = 0;
 			return MERGED;
 		}
 		else if (num == 0 || other.num == 0)
-		{
+		{			
 			num += other.num;
 			other.num = 0;
 			return ZERO;
@@ -147,12 +149,20 @@ public class MatrixView extends TextView
 	private final int m_nColumns = 5;
 	private final float m_fDefaultTextSize = 400.0f / m_nColumns;
 	private final float m_fDescent = 15.0f;
-	private HashMap<Integer, Float> m_textSizeMap = new HashMap<Integer, Float>();
+	private SparseArray<Float> m_textSizeMap = new SparseArray<Float>();
 	private IntRectF[][] m_elementRects;
 	private RandomGenerator m_rg;
 	private Paint m_painter;
 	private Paint m_textPainter;
 	private boolean m_bInitElement = false;
+	
+	static int makeMark(int num, int i)
+	{
+		if (num != 0)
+			return (1 << i);
+		else
+			return 0;
+	}
 	
 	public MatrixView(Context context, AttributeSet attribs) {
 		super(context, attribs);
@@ -209,12 +219,136 @@ public class MatrixView extends TextView
 		return c;
 	}
 	
-	private void moveLeft(IntRectF[] ira)
+	private boolean canMoveFromRightToleft(IntRectF[] ira)
 	{
+		boolean bFirstCount = false;
+		boolean bZeroCount = false;
+		for (int i = 0; i < ira.length; --i)
+		{
+			if (!bFirstCount)
+			{
+				if (ira[i].num == 0)
+				{
+					bZeroCount = true;
+				}
+
+				bFirstCount = true;
+				continue;
+			}
+			
+			if (!bZeroCount)
+			{
+				if (ira[i].num == 0)
+					bZeroCount = true;
+			}
+			else if (ira[i].num != 0)
+				return true;				
+		}
+		
+		return false;
+	}
+	
+	private boolean canMoveFromLeftToRight(IntRectF[] ira)
+	{
+		boolean bFirstCount = false;
+		boolean bZeroCount = false;
+		for (int i = ira.length - 1; i >= 0; --i)
+		{
+			if (!bFirstCount)
+			{
+				if (ira[i].num == 0)
+				{
+					bZeroCount = true;
+				}
+
+				bFirstCount = true;
+				continue;
+			}
+			
+			if (!bZeroCount)
+			{
+				if (ira[i].num == 0)
+					bZeroCount = true;
+			}
+			else if (ira[i].num != 0)
+				return true;				
+		}
+		
+		return false;
+	}
+	
+	private boolean canMoveFromUpToDown(int iColumn)
+	{
+		if (iColumn >= m_elementRects.length || iColumn < 0)
+			return false;
+		
+		boolean bFirstCount = false;
+		boolean bZeroCount = false;
+		for (int i = 0; i < m_elementRects.length; ++i)
+		{
+			if (!bFirstCount)
+			{
+				if (m_elementRects[i][iColumn].num == 0)
+				{
+					bZeroCount = true;
+				}
+
+				bFirstCount = true;
+				continue;
+			}
+			
+			if (!bZeroCount)
+			{
+				if (m_elementRects[i][iColumn].num == 0)
+					bZeroCount = true;
+			}
+			else if (m_elementRects[i][iColumn].num != 0)
+				return true;				
+		}
+		return false;
+	}
+	
+	private boolean canMoveFromDownToUp(int iColumn)
+	{
+		if (iColumn >= m_elementRects.length || iColumn < 0)
+			return false;
+		
+		boolean bFirstCount = false;
+		boolean bZeroCount = false;
+		for (int i = m_elementRects.length - 1; i >= 0; --i)
+		{
+			if (!bFirstCount)
+			{
+				if (m_elementRects[i][iColumn].num == 0)
+				{
+					bZeroCount = true;
+				}
+
+				bFirstCount = true;
+				continue;
+			}
+			
+			if (!bZeroCount)
+			{
+				if (m_elementRects[i][iColumn].num == 0)
+					bZeroCount = true;
+			}
+			else if (m_elementRects[i][iColumn].num != 0)
+				return true;				
+		}
+		
+		return false;
+	}
+	
+	private boolean moveLeft(IntRectF[] ira)
+	{
+	//	if (!canMoveFromRightToleft(ira))
+	//		return false;
+		
 		ArrayList<Integer> c = collectNotZero(ira);
 		
 		if (c.size() == 0)
-			return;
+			return false;
 		
 		int i = 0;
 		for (; i < c.size(); ++i)
@@ -226,14 +360,19 @@ public class MatrixView extends TextView
 		{
 			ira[i].num = 0;
 		}
+		
+		return true;
 	}
 	
-	private void moveRight(IntRectF[] ira)
+	private boolean moveRight(IntRectF[] ira)
 	{
+	//	if (!canMoveFromLeftToRight(ira))
+	//		return false;
+		
 		ArrayList<Integer> c = collectNotZero(ira);
 		
 		if (c.size() == 0)
-			return;
+			return false;
 		
 		int n = ira.length - c.size();
 		for (int i = 0; i < n; ++i)
@@ -245,17 +384,22 @@ public class MatrixView extends TextView
 		{
 			ira[i].num = c.get(j);
 		}
+		
+		return true;
 	}
 	
-	private void moveDown(int iColumn)
+	private boolean moveDown(int iColumn)
 	{				
 		if (iColumn >= m_nColumns || iColumn < 0)
-			return;
+			return false;
+		
+	//	if (!canMoveFromUpToDown(iColumn))
+	//		return false;
 		
 		ArrayList<Integer> c = collectNotZero(iColumn);
 		
 		if (c.size() == 0)
-			return;
+			return false;
 		
 		int n = m_nColumns - c.size();
 		
@@ -268,17 +412,22 @@ public class MatrixView extends TextView
 		{
 			m_elementRects[i][iColumn].num = c.get(j);
 		}
+		
+		return true;
 	}
 	
-	private void moveUp(int iColumn)
+	private boolean moveUp(int iColumn)
 	{	
 		if (iColumn >= m_nColumns || iColumn < 0)
-			return;
+			return false;
+		
+	//	if (!canMoveFromDownToUp(iColumn))
+	//		return false;
 		
 		ArrayList<Integer> c = collectNotZero(iColumn);
 		
 		if (c.size() == 0)
-			return;
+			return false;
 				
 		int i = 0;
 		for (; i < c.size(); ++i)
@@ -290,38 +439,37 @@ public class MatrixView extends TextView
 		{
 			m_elementRects[i][iColumn].num = 0;
 		}
+		
+		return true;
 	}
 	
 	private void slideLeft()
 	{
-		boolean bMoveLeft = false;
-		boolean bBlocked = true;
-		int addResult = IntRectF.ZERO;
+		boolean bRefresh = false;
+		int beforeMerge = 0;
+		int afterMerge  = 0;
+		
 		for (IntRectF[] ira : m_elementRects)
 		{
+			beforeMerge |= makeMark(ira[0].num, 0);
 			for (int i = ira.length - 1; i > 0; --i)
 			{
-				addResult = ira[i - 1].Add(ira[i]);
-				
-				switch (addResult)
-				{
-				case IntRectF.ZERO:
-					bMoveLeft = true;
-					// no break;
-				case IntRectF.MERGED:
-					bBlocked = false;
-				default:
-					break;
-				}
+				beforeMerge |= makeMark(ira[i].num, i);
+				ira[i - 1].Add(ira[i]);
+				afterMerge |= makeMark(ira[i].num, i);				
 			}
+			afterMerge |= makeMark(ira[0].num, 0);
 			
-			if (bMoveLeft)
+			if (beforeMerge != afterMerge)
 			{
 				moveLeft(ira);
+				bRefresh = true;
 			}
+			
+			beforeMerge = afterMerge = 0;
 		}
 		
-		if (!bBlocked)
+		if (bRefresh)
 		{
 			genNumber();
 			invalidate();
@@ -330,34 +478,31 @@ public class MatrixView extends TextView
 	
 	private void slideRight()
 	{
-		boolean bMoveRight = false;
-		boolean bBlocked = true;
-		int addResult = IntRectF.ZERO;
+		boolean bRefresh = false;
+		int beforeMerge = 0;
+		int afterMerge  = 0;
+		
 		for (IntRectF[] ira : m_elementRects)
 		{
+			beforeMerge |= makeMark(ira[ira.length - 1].num, ira.length - 1);
 			for (int i = 0; i < ira.length - 1 ; ++i)
 			{
-				addResult = ira[i + 1].Add(ira[i]);
-				
-				switch (addResult)
-				{
-				case IntRectF.ZERO:
-					bMoveRight = true;
-					// no break;
-				case IntRectF.MERGED:
-					bBlocked = false;
-				default:
-					break;
-				}
+				beforeMerge |= makeMark(ira[i].num, i);
+				ira[i + 1].Add(ira[i]);
+				afterMerge |= makeMark(ira[i].num, i);
 			}
+			afterMerge |= makeMark(ira[ira.length - 1].num, ira.length - 1);
 			
-			if (bMoveRight)
+			if (beforeMerge != afterMerge)
 			{
 				moveRight(ira);
+				bRefresh = true;
 			}
+			
+			beforeMerge = afterMerge = 0;
 		}	
 		
-		if (!bBlocked)
+		if (bRefresh)
 		{
 			genNumber();
 			invalidate();
@@ -366,34 +511,31 @@ public class MatrixView extends TextView
 	
 	private void slideUp()
 	{
-		boolean bMoveUp = false;
-		boolean bBlocked = true;
-		int addResult = IntRectF.ZERO;		
+		boolean bRefresh = false;
+		int beforeMerge = 0;
+		int afterMerge  = 0;
+		
 		for (int j = 0; j < m_nColumns; ++j)
-		{		
+		{	
+			beforeMerge |= makeMark(m_elementRects[0][j].num, 0);
 			for (int i = m_elementRects.length - 1; i > 0; --i)
 			{
-				addResult = m_elementRects[i - 1][j].Add(m_elementRects[i][j]);
-				switch (addResult)
-				{
-				case IntRectF.ZERO:
-					bMoveUp = true;
-					// no break;
-				case IntRectF.MERGED:
-					bBlocked = false;
-				default:
-					break;
-				}
+				beforeMerge |= makeMark(m_elementRects[i][j].num, i);	
+				m_elementRects[i - 1][j].Add(m_elementRects[i][j]);
+				afterMerge |= makeMark(m_elementRects[i][j].num, i);	
 			}
+			afterMerge |= makeMark(m_elementRects[0][j].num, 0);			
 			
-			
-			if (bMoveUp)
+			if (beforeMerge != afterMerge)
 			{
 				moveUp(j);
+				bRefresh = true;
 			}
+
+			beforeMerge = afterMerge = 0;
 		}
 
-		if (!bBlocked)
+		if (bRefresh)
 		{
 			genNumber();
 			invalidate();
@@ -402,33 +544,32 @@ public class MatrixView extends TextView
 	
 	private void slideDown()
 	{
-		boolean bMoveDown = false;
-		boolean bBlocked = true;
-		int addResult = IntRectF.ZERO;
+		boolean bRefresh = false;
+		int beforeMerge = 0;
+		int afterMerge  = 0;
+		
 		for (int j = 0; j < m_nColumns; ++j)
-		{		
+		{	
+			beforeMerge |= makeMark(m_elementRects[m_elementRects.length - 1][j].num, m_elementRects.length - 1);
 			for (int i = 0; i < m_elementRects.length - 1; ++i)
 			{
-				addResult = m_elementRects[i + 1][j].Add(m_elementRects[i][j]);
-				switch (addResult)
-				{
-				case IntRectF.ZERO:
-					bMoveDown = true;
-					// no break;
-				case IntRectF.MERGED:
-					bBlocked = false;
-				default:
-					break;
-				}
+				beforeMerge |= makeMark(m_elementRects[i][j].num, i);
+				m_elementRects[i + 1][j].Add(m_elementRects[i][j]);
+				afterMerge |= makeMark(m_elementRects[i][j].num, i);
+
 			}
-			
-			if (bMoveDown)
+			afterMerge |= makeMark(m_elementRects[m_elementRects.length - 1][j].num, m_elementRects.length - 1);
+
+			if (beforeMerge != afterMerge)
 			{
 				moveDown(j);
+				bRefresh = true;
 			}
+
+			beforeMerge = afterMerge = 0;
 		}
 
-		if (!bBlocked)
+		if (bRefresh)
 		{
 			genNumber();
 			invalidate();
